@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
-import tareasPorGrupo from "../data/tareas.json";
 
 const COLORS = {
   pendiente: "#facc15",
@@ -11,11 +10,15 @@ const COLORS = {
   finalizado: "#4ade80"
 };
 
-export default function Dashboard() {
-  const grupos = Object.keys(tareasPorGrupo);
-  const [grupoSeleccionado, setGrupoSeleccionado] = useState(grupos[0]);
+export default function Dashboard({ tareasPorGrupo, grupoActivo }) {
+  const [grupoSeleccionado, setGrupoSeleccionado] = useState(grupoActivo);
 
-  const tareas = useMemo(() => tareasPorGrupo[grupoSeleccionado] || [], [grupoSeleccionado]);
+  useEffect(() => {
+    setGrupoSeleccionado(grupoActivo);
+  }, [grupoActivo]);
+
+  const grupos = Object.keys(tareasPorGrupo || {});
+  const tareas = useMemo(() => tareasPorGrupo[grupoSeleccionado] || [], [grupoSeleccionado, tareasPorGrupo]);
 
   const tareasPorEstado = useMemo(() => {
     return ["pendiente", "en curso", "finalizado"].map((estado) => ({
