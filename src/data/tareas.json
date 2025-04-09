@@ -1,0 +1,84 @@
+{
+  "Enero 2025": [
+    {
+      "status": "pendiente",
+      "title": "SOW enviar correo a Hector",
+      "owner": "Ricardo",
+      "dueDate": "",
+      "priority": "",
+      "notes": ""
+    },
+    {
+      "status": "pendiente",
+      "title": "Firma de Documento Final de SKF (Docusing)",
+      "owner": "Jonathan",
+      "dueDate": "2024-12-23 00:00:00",
+      "priority": "",
+      "notes": "Han aparecido problemas en el tablero"
+    },
+    {
+      "status": "pendiente",
+      "title": "Seguimiento pago Wamaberry",
+      "owner": "Ricardo",
+      "dueDate": "",
+      "priority": "",
+      "notes": ""
+    },
+    {
+      "status": "pendiente",
+      "title": "Seguimiento logo de HIFICLICK",
+      "owner": "Ricardo",
+      "dueDate": "",
+      "priority": "",
+      "notes": "Se espera respuesta sobre las opciones de logos"
+    },
+    {
+      "status": "finalizado",
+      "title": "DEMO web de HIFICLICK",
+      "owner": "Jonathan",
+      "dueDate": "",
+      "priority": "",
+      "notes": "Se creó una pagina demo basada en la pagina de hificlick"
+    },
+    {
+      "status": "pendiente",
+      "title": "Plan de acción con Robert - nuevo ajsutes SKF",
+      "owner": "Jonathan",
+      "dueDate": "2024-12-20 00:00:00",
+      "priority": "Alta",
+      "notes": "Correo Enviado pero falta coordinar con el Ing Edgar Ramirez"
+    },
+    {
+      "status": "pendiente",
+      "title": "Enviar Resumen de LexLatin",
+      "owner": "",
+      "dueDate": "",
+      "priority": "",
+      "notes": ""
+    },
+    {
+      "status": "pendiente",
+      "title": "Filosofar sobre Proyecto Photos y HRBO Carlos Galvizu",
+      "owner": "",
+      "dueDate": "",
+      "priority": "",
+      "notes": ""
+    },
+    {
+      "status": "pendiente",
+      "title": "Story Telling de Épico!",
+      "owner": "Todos",
+      "dueDate": "",
+      "priority": "",
+      "notes": "https://www.beerhouse.mx/productos/colima-piedra-lisa/?srsltid=AfmBOopc1mliwm4x7MO6h1iCpb1FJ0dJsKbVIZHNgSIk4QwxQPor7oc9"
+    },
+    {
+      "status": "pendiente",
+      "title": "Preparación de Proyectos Carlos Galvizu",
+      "owner": "Ricardo",
+      "dueDate": "2024-12-10 00:00:00",
+      "priority": "",
+      "notes": ""
+    }
+  ]
+}
