@@ -1,18 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import Dashboard from "./pages/Dashboard";
-import tareasPorGrupoInicial from "./data/tareas.json"; // o puedes reemplazar con fetch al backend
+import { getTasks } from "./api/tasks";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [tasks, setTasks] = useState([]);
+  const [grupoActivo, setGrupoActivo] = useState("Enero 2025");
 
-  // Estado centralizado
-  const [tareasPorGrupo, setTareasPorGrupo] = useState(tareasPorGrupoInicial);
-  const grupos = Object.keys(tareasPorGrupo);
-  const [grupoActivo, setGrupoActivo] = useState(grupos[0]);
+  useEffect(() => {
+    async function fetchTasks() {
+      try {
+        const res = await getTasks();
+        setTasks(res.data);
+      } catch (err) {
+        console.error("Error al cargar tareas en App.js:", err);
+      }
+    }
+    fetchTasks();
+  }, []);
+
+  const tareasPorGrupo = tasks.reduce((acc, tarea) => {
+    const grupo = tarea.group || "Sin grupo";
+    if (!acc[grupo]) acc[grupo] = [];
+    acc[grupo].push(tarea);
+    return acc;
+  }, {});
 
   return (
     <Router>
@@ -30,17 +46,7 @@ function App() {
           {/* Contenido principal */}
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route
-              path="/tareas"
-              element={
-                <Tasks
-                  tareasPorGrupo={tareasPorGrupo}
-                  setTareasPorGrupo={setTareasPorGrupo}
-                  grupoActivo={grupoActivo}
-                  setGrupoActivo={setGrupoActivo}
-                />
-              }
-            />
+            <Route path="/tareas" element={<Tasks />} />
             <Route
               path="/dashboard"
               element={
