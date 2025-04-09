@@ -4,9 +4,15 @@ import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import Dashboard from "./pages/Dashboard";
+import tareasPorGrupoInicial from "./data/tareas.json"; // o puedes reemplazar con fetch al backend
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Estado centralizado
+  const [tareasPorGrupo, setTareasPorGrupo] = useState(tareasPorGrupoInicial);
+  const grupos = Object.keys(tareasPorGrupo);
+  const [grupoActivo, setGrupoActivo] = useState(grupos[0]);
 
   return (
     <Router>
@@ -24,8 +30,26 @@ function App() {
           {/* Contenido principal */}
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/tareas" element={<Tasks />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route
+              path="/tareas"
+              element={
+                <Tasks
+                  tareasPorGrupo={tareasPorGrupo}
+                  setTareasPorGrupo={setTareasPorGrupo}
+                  grupoActivo={grupoActivo}
+                  setGrupoActivo={setGrupoActivo}
+                />
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <Dashboard
+                  tareasPorGrupo={tareasPorGrupo}
+                  grupoActivo={grupoActivo}
+                />
+              }
+            />
           </Routes>
         </div>
       </div>

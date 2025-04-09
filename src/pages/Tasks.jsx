@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import TaskCard from "../components/TaskCard";
 import EditTaskModal from "../components/EditTaskModal";
 import NewGroupModal from "../components/NewGroupModal";
@@ -10,9 +10,11 @@ import {
   deleteTask,
 } from "../api/tasks";
 
-export default function Tasks() {
+export default function Tasks({
+  grupoActivo,
+  setGrupoActivo
+}) {
   const [tasks, setTasks] = useState([]);
-  const [grupoActivo, setGrupoActivo] = useState("Enero 2025");
   const [editingTask, setEditingTask] = useState(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
