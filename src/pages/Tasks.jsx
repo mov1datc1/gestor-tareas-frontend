@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import TaskCard from "../components/TaskCard";
 import EditTaskModal from "../components/EditTaskModal";
@@ -9,6 +10,7 @@ import {
   updateTask,
   deleteTask,
 } from "../api/tasks";
+import axios from "axios";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -18,21 +20,20 @@ export default function Tasks() {
   const [showNewTask, setShowNewTask] = useState(false);
   const [filtroPrioridad, setFiltroPrioridad] = useState("Todas");
   const [filtroResponsable, setFiltroResponsable] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [nuevoNombreGrupo, setNuevoNombreGrupo] = useState("");
 
   useEffect(() => {
-    async function fetchTasks() {
-      try {
-        const res = await getTasks();
-        setTasks(res.data);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error cargando tareas:", err);
-        setLoading(false);
-      }
-    }
     fetchTasks();
   }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const res = await getTasks();
+      setTasks(res.data);
+    } catch (err) {
+      console.error("Error cargando tareas:", err);
+    }
+  };
 
   const grupos = [...new Set(tasks.map((t) => t.group))];
 
@@ -51,26 +52,6 @@ export default function Tasks() {
 
   const handleGrupoChange = (nuevoGrupo) => {
     setGrupoActivo(nuevoGrupo);
-  };
-
-  const handleRenameGroup = () => {
-    const nuevoNombre = prompt("Nuevo nombre para el grupo:", grupoActivo);
-    if (!nuevoNombre || nuevoNombre === grupoActivo) return;
-    const tareasActuales = tasks.map((t) =>
-      t.group === grupoActivo ? { ...t, group: nuevoNombre } : t
-    );
-    setTasks(tareasActuales);
-    setGrupoActivo(nuevoNombre);
-  };
-
-  const handleDeleteGroup = () => {
-    const confirmacion = confirm(
-      `¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`
-    );
-    if (!confirmacion) return;
-    const tareasRestantes = tasks.filter((t) => t.group !== grupoActivo);
-    setTasks(tareasRestantes);
-    setGrupoActivo(tareasRestantes.length ? tareasRestantes[0].group : "");
   };
 
   const handleStatusChange = async (task, newStatus) => {
@@ -121,38 +102,49 @@ export default function Tasks() {
     }
   };
 
+  const handleDeleteGroup = async () => {
+    try {
+      await axios.delete(`/api/groups/${grupoActivo}`);
+      await fetchTasks();
+      const restantes = grupos.filter((g) => g !== grupoActivo);
+      setGrupoActivo(restantes[0] || "");
+    } catch (err) {
+      console.error("Error eliminando grupo:", err);
+    }
+  };
+
+  const handleRenameGroup = async () => {
+    if (!nuevoNombreGrupo.trim()) return;
+    try {
+      await axios.put(`/api/groups/${grupoActivo}`, {
+        newGroupName: nuevoNombreGrupo,
+      });
+      setGrupoActivo(nuevoNombreGrupo);
+      setNuevoNombreGrupo("");
+      await fetchTasks();
+    } catch (err) {
+      console.error("Error renombrando grupo:", err);
+    }
+  };
+
   return (
     <div className="p-6 flex-1">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold text-darkGray mb-2">
-            Tareas de {grupoActivo || "(sin grupo)"}
+            Tareas de {grupoActivo}
           </h1>
-          <div className="flex gap-2 items-center">
-            <select
-              value={grupoActivo}
-              onChange={(e) => handleGrupoChange(e.target.value)}
-              className="p-2 border rounded"
-            >
-              {grupos.map((grupo) => (
-                <option key={grupo} value={grupo}>
-                  {grupo}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleRenameGroup}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Editar
-            </button>
-            <button
-              onClick={handleDeleteGroup}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Eliminar
-            </button>
-          </div>
+          <select
+            value={grupoActivo}
+            onChange={(e) => handleGrupoChange(e.target.value)}
+            className="p-2 border rounded"
+          >
+            {grupos.map((grupo) => (
+              <option key={grupo} value={grupo}>
+                {grupo}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex gap-2">
           <button
@@ -170,7 +162,8 @@ export default function Tasks() {
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-4 mb-6">
         <select
           value={filtroPrioridad}
           onChange={(e) => setFiltroPrioridad(e.target.value)}
@@ -188,11 +181,29 @@ export default function Tasks() {
           placeholder="Filtrar por responsable"
           className="p-2 border rounded w-64"
         />
+        <input
+          type="text"
+          value={nuevoNombreGrupo}
+          onChange={(e) => setNuevoNombreGrupo(e.target.value)}
+          placeholder="Nuevo nombre del grupo"
+          className="p-2 border rounded"
+        />
+        <button
+          onClick={handleRenameGroup}
+          className="bg-yellow-400 text-white px-3 py-2 rounded hover:bg-yellow-500"
+        >
+          Renombrar Grupo
+        </button>
+        <button
+          onClick={handleDeleteGroup}
+          className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
+        >
+          Eliminar Grupo
+        </button>
       </div>
 
-      {loading ? (
-        <p className="text-gray-500 italic">Cargando tareas...</p>
-      ) : tareasFiltradas.length === 0 ? (
+      {/* Tareas */}
+      {tareasFiltradas.length === 0 ? (
         <p className="text-gray-500 italic">
           No hay tareas que coincidan con los filtros.
         </p>
@@ -208,6 +219,7 @@ export default function Tasks() {
         ))
       )}
 
+      {/* Modales */}
       {editingTask && (
         <EditTaskModal
           task={editingTask}
@@ -232,5 +244,3 @@ export default function Tasks() {
     </div>
   );
 }
-
-
