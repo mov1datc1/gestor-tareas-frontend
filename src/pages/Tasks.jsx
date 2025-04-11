@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import TaskCard from "../components/TaskCard";
 import EditTaskModal from "../components/EditTaskModal";
@@ -11,53 +10,92 @@ import {
   deleteTask,
 } from "../api/tasks";
 import {
-  getGroups,
-  createGroup,
-  updateGroup,
-  deleteGroup,
+  renameGroup as renameGroupAPI,
+  deleteGroup as deleteGroupAPI,
 } from "../api/groups";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [grupoActivo, setGrupoActivo] = useState("");
+  const [grupoActivo, setGrupoActivo] = useState("Enero 2025");
   const [editingTask, setEditingTask] = useState(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [filtroPrioridad, setFiltroPrioridad] = useState("Todas");
   const [filtroResponsable, setFiltroResponsable] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchAllTasks();
   }, []);
 
-  const fetchData = async () => {
+  const fetchAllTasks = async () => {
     try {
-      const [tasksRes, groupsRes] = await Promise.all([getTasks(), getGroups()]);
-      setTasks(tasksRes.data);
-      setGroups(groupsRes.data);
-      if (!grupoActivo && groupsRes.data.length > 0) {
-        setGrupoActivo(groupsRes.data[0].name);
-      }
+      const res = await getTasks();
+      setTasks(res.data);
+      setLoading(false);
     } catch (err) {
-      console.error("Error cargando datos:", err);
+      console.error("Error cargando tareas:", err);
+      setLoading(false);
     }
   };
 
+  const grupos = [...new Set(tasks.map((t) => t.group))];
+
   const tareasFiltradas = tasks
     .filter((t) => t.group === grupoActivo)
-    .filter((t) => filtroPrioridad === "Todas" || t.priority === filtroPrioridad)
     .filter((t) =>
-      filtroResponsable === "" ||
-      (t.owner || "").toLowerCase().includes(filtroResponsable.toLowerCase())
+      filtroPrioridad === "Todas" ? true : t.priority === filtroPrioridad
+    )
+    .filter((t) =>
+      filtroResponsable === ""
+        ? true
+        : (t.owner || "")
+            .toLowerCase()
+            .includes(filtroResponsable.toLowerCase())
     );
 
-  const handleGrupoChange = (nuevoGrupo) => setGrupoActivo(nuevoGrupo);
+  const handleGrupoChange = (nuevoGrupo) => {
+    setGrupoActivo(nuevoGrupo);
+  };
+
+  const handleRenameGroup = async () => {
+    const nuevoNombre = prompt("Nuevo nombre para el grupo:", grupoActivo);
+    if (!nuevoNombre || nuevoNombre === grupoActivo) return;
+
+    try {
+      await renameGroupAPI(grupoActivo, nuevoNombre);
+      await fetchAllTasks();
+      setGrupoActivo(nuevoNombre);
+    } catch (err) {
+      console.error("Error al renombrar grupo:", err);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    const confirmacion = confirm(
+      `¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`
+    );
+    if (!confirmacion) return;
+
+    try {
+      await deleteGroupAPI(grupoActivo);
+      await fetchAllTasks();
+      const gruposRestantes = [...new Set(tasks.map((t) => t.group))].filter(
+        (g) => g !== grupoActivo
+      );
+      setGrupoActivo(gruposRestantes[0] || "");
+    } catch (err) {
+      console.error("Error eliminando grupo:", err);
+    }
+  };
 
   const handleStatusChange = async (task, newStatus) => {
     try {
       const res = await updateTask(task._id, { ...task, status: newStatus });
-      setTasks(tasks.map((t) => (t._id === task._id ? res.data : t)));
+      const updated = tasks.map((t) =>
+        t._id === task._id ? res.data : t
+      );
+      setTasks(updated);
     } catch (err) {
       console.error("Error actualizando estatus:", err);
     }
@@ -66,49 +104,18 @@ export default function Tasks() {
   const handleEditSave = async (updatedTask) => {
     try {
       const res = await updateTask(updatedTask._id, updatedTask);
-      setTasks(tasks.map((t) => (t._id === updatedTask._id ? res.data : t)));
+      const updated = tasks.map((t) =>
+        t._id === updatedTask._id ? res.data : t
+      );
+      setTasks(updated);
       setEditingTask(null);
     } catch (err) {
       console.error("Error editando tarea:", err);
     }
   };
 
-  const handleCreateNewGroup = async (newGroupName) => {
-    try {
-      await createGroup({ name: newGroupName });
-      fetchData();
-      setGrupoActivo(newGroupName);
-    } catch (err) {
-      console.error("Error creando grupo:", err);
-    }
-  };
-
-  const handleEditGroup = async () => {
-    const nuevoNombre = prompt("Nuevo nombre del grupo:", grupoActivo);
-    if (nuevoNombre && nuevoNombre !== grupoActivo) {
-      try {
-        const grupo = groups.find((g) => g.name === grupoActivo);
-        await updateGroup(grupo._id, { name: nuevoNombre });
-        fetchData();
-        setGrupoActivo(nuevoNombre);
-      } catch (err) {
-        console.error("Error actualizando grupo:", err);
-      }
-    }
-  };
-
-  const handleDeleteGroup = async () => {
-    const confirmacion = window.confirm(`¿Estás seguro de eliminar el grupo "${grupoActivo}"? Esto eliminará todas sus tareas.`);
-    if (confirmacion) {
-      try {
-        const grupo = groups.find((g) => g.name === grupoActivo);
-        await deleteGroup(grupo._id);
-        fetchData();
-        setGrupoActivo("");
-      } catch (err) {
-        console.error("Error eliminando grupo:", err);
-      }
-    }
+  const handleCreateNewGroup = (newGroupName) => {
+    setGrupoActivo(newGroupName);
   };
 
   const handleAddNewTask = async (newTask) => {
@@ -134,22 +141,48 @@ export default function Tasks() {
     <div className="p-6 flex-1">
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-darkGray mb-2">Tareas de {grupoActivo}</h1>
-          <select
-            value={grupoActivo}
-            onChange={(e) => handleGrupoChange(e.target.value)}
-            className="p-2 border rounded"
-          >
-            {groups.map((grupo) => (
-              <option key={grupo._id} value={grupo.name}>{grupo.name}</option>
-            ))}
-          </select>
+          <h1 className="text-2xl font-bold text-darkGray mb-2">
+            Tareas de {grupoActivo || "(sin grupo)"}
+          </h1>
+          <div className="flex gap-2 items-center">
+            <select
+              value={grupoActivo}
+              onChange={(e) => handleGrupoChange(e.target.value)}
+              className="p-2 border rounded"
+            >
+              {grupos.map((grupo) => (
+                <option key={grupo} value={grupo}>
+                  {grupo}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleRenameGroup}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </button>
+            <button
+              onClick={handleDeleteGroup}
+              className="text-sm text-red-600 hover:underline"
+            >
+              Eliminar
+            </button>
+          </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleEditGroup} className="bg-yellow-400 text-white px-3 py-1 rounded hover:bg-yellow-500">✎ Editar Grupo</button>
-          <button onClick={handleDeleteGroup} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">🗑️ Eliminar Grupo</button>
-          <button onClick={() => setShowNewGroup(true)} className="bg-primary text-white px-3 py-1 rounded hover:bg-blue-700">+ Nuevo Grupo</button>
-          <button onClick={() => setShowNewTask(true)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">+ Nueva Tarea</button>
+          <button
+            onClick={() => setShowNewGroup(true)}
+            className="bg-primary text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            + Nuevo Grupo
+          </button>
+          <button
+            onClick={() => setShowNewTask(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            + Nueva Tarea
+          </button>
         </div>
       </div>
 
@@ -173,8 +206,12 @@ export default function Tasks() {
         />
       </div>
 
-      {tareasFiltradas.length === 0 ? (
-        <p className="text-gray-500 italic">No hay tareas que coincidan con los filtros.</p>
+      {loading ? (
+        <p className="text-gray-500 italic">Cargando tareas...</p>
+      ) : tareasFiltradas.length === 0 ? (
+        <p className="text-gray-500 italic">
+          No hay tareas que coincidan con los filtros.
+        </p>
       ) : (
         tareasFiltradas.map((task) => (
           <TaskCard
