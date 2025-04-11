@@ -9,11 +9,11 @@ import {
   updateTask,
   deleteTask,
 } from "../api/tasks";
-import { renameGroup, deleteGroup as deleteGroupAPI } from "../api/groups";
+import axios from "axios";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
-  const [grupoActivo, setGrupoActivo] = useState("Enero 2025");
+  const [grupoActivo, setGrupoActivo] = useState("");
   const [editingTask, setEditingTask] = useState(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -22,19 +22,22 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    async function fetchTasks() {
+      try {
+        const res = await getTasks();
+        setTasks(res.data);
+        const nombresDeGrupos = [...new Set(res.data.map((t) => t.group))];
+        if (!nombresDeGrupos.includes(grupoActivo)) {
+          setGrupoActivo(nombresDeGrupos[0] || "");
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error("Error cargando tareas:", err);
+        setLoading(false);
+      }
+    }
     fetchTasks();
   }, []);
-
-  const fetchTasks = async () => {
-    try {
-      const res = await getTasks();
-      setTasks(res.data);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error cargando tareas:", err);
-      setLoading(false);
-    }
-  };
 
   const grupos = [...new Set(tasks.map((t) => t.group))];
 
@@ -60,13 +63,15 @@ export default function Tasks() {
     if (!nuevoNombre || nuevoNombre === grupoActivo) return;
 
     try {
-      await renameGroup(grupoActivo, nuevoNombre);
-      await fetchTasks(); // Recargar tareas actualizadas
+      await axios.put(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/groups/${grupoActivo}`,
+        { newGroupName: nuevoNombre }
+      );
+      const res = await getTasks();
+      setTasks(res.data);
       setGrupoActivo(nuevoNombre);
-      alert("Grupo renombrado exitosamente.");
-    } catch (error) {
-      console.error("Error renombrando grupo:", error);
-      alert("Error al renombrar grupo.");
+    } catch (err) {
+      console.error("Error renombrando grupo:", err);
     }
   };
 
@@ -77,23 +82,22 @@ export default function Tasks() {
     if (!confirmacion) return;
 
     try {
-      await deleteGroupAPI(grupoActivo);
+      await axios.delete(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/groups/${grupoActivo}`
+      );
       const tareasRestantes = tasks.filter((t) => t.group !== grupoActivo);
       setTasks(tareasRestantes);
-      setGrupoActivo(tareasRestantes.length ? tareasRestantes[0].group : "");
-      alert("Grupo eliminado exitosamente.");
-    } catch (error) {
-      console.error("Error eliminando grupo:", error);
-      alert("Error al eliminar grupo.");
+      const nuevosGrupos = [...new Set(tareasRestantes.map((t) => t.group))];
+      setGrupoActivo(nuevosGrupos[0] || "");
+    } catch (err) {
+      console.error("Error eliminando grupo:", err);
     }
   };
 
   const handleStatusChange = async (task, newStatus) => {
     try {
       const res = await updateTask(task._id, { ...task, status: newStatus });
-      const updated = tasks.map((t) =>
-        t._id === task._id ? res.data : t
-      );
+      const updated = tasks.map((t) => (t._id === task._id ? res.data : t));
       setTasks(updated);
     } catch (err) {
       console.error("Error actualizando estatus:", err);
