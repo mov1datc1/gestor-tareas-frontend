@@ -9,10 +9,7 @@ import {
   updateTask,
   deleteTask,
 } from "../api/tasks";
-import {
-  renameGroup as renameGroupAPI,
-  deleteGroup as deleteGroupAPI,
-} from "../api/groups";
+import { renameGroup, deleteGroup as deleteGroupAPI } from "../api/groups";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -25,10 +22,10 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAllTasks();
+    fetchTasks();
   }, []);
 
-  const fetchAllTasks = async () => {
+  const fetchTasks = async () => {
     try {
       const res = await getTasks();
       setTasks(res.data);
@@ -63,11 +60,13 @@ export default function Tasks() {
     if (!nuevoNombre || nuevoNombre === grupoActivo) return;
 
     try {
-      await renameGroupAPI(grupoActivo, nuevoNombre);
-      await fetchAllTasks();
+      await renameGroup(grupoActivo, nuevoNombre);
+      await fetchTasks(); // Recargar tareas actualizadas
       setGrupoActivo(nuevoNombre);
-    } catch (err) {
-      console.error("Error al renombrar grupo:", err);
+      alert("Grupo renombrado exitosamente.");
+    } catch (error) {
+      console.error("Error renombrando grupo:", error);
+      alert("Error al renombrar grupo.");
     }
   };
 
@@ -79,13 +78,13 @@ export default function Tasks() {
 
     try {
       await deleteGroupAPI(grupoActivo);
-      await fetchAllTasks();
-      const gruposRestantes = [...new Set(tasks.map((t) => t.group))].filter(
-        (g) => g !== grupoActivo
-      );
-      setGrupoActivo(gruposRestantes[0] || "");
-    } catch (err) {
-      console.error("Error eliminando grupo:", err);
+      const tareasRestantes = tasks.filter((t) => t.group !== grupoActivo);
+      setTasks(tareasRestantes);
+      setGrupoActivo(tareasRestantes.length ? tareasRestantes[0].group : "");
+      alert("Grupo eliminado exitosamente.");
+    } catch (error) {
+      console.error("Error eliminando grupo:", error);
+      alert("Error al eliminar grupo.");
     }
   };
 
@@ -248,3 +247,4 @@ export default function Tasks() {
     </div>
   );
 }
+
