@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Home, ListChecks, X } from 'lucide-react';
+import { LayoutDashboard, Home, ListChecks, X, KanbanSquare } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onToggle }) {
   const location = useLocation();
@@ -7,7 +7,8 @@ export default function Sidebar({ isOpen, onToggle }) {
   const menuItems = [
     { name: "Inicio", path: "/", icon: <Home size={18} /> },
     { name: "Tareas", path: "/tareas", icon: <ListChecks size={18} /> },
-    { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> }
+    { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
+    { name: "Proyectos", path: "/proyectos", icon: <KanbanSquare size={18} /> }, // Nuevo
   ];
 
   return (
@@ -39,7 +40,7 @@ export default function Sidebar({ isOpen, onToggle }) {
                   ? 'bg-primary text-white'
                   : 'text-gray-700 hover:bg-primary/10 hover:text-primary'
               }`}
-              onClick={onToggle} // auto-cierra el menú en móvil
+              onClick={onToggle}
             >
               {item.icon}
               <span className="font-medium">{item.name}</span>

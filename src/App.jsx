@@ -4,6 +4,8 @@ import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import Dashboard from "./pages/Dashboard";
+import ProjectBoard from "./pages/ProjectBoard";
+
 import { getTasks } from "./api/tasks";
 
 function App() {
@@ -47,6 +49,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/tareas" element={<Tasks />} />
+			<Route path="/proyectos" element={<ProjectBoard />} />
+
             <Route
               path="/dashboard"
               element={
