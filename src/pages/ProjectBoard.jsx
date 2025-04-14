@@ -46,7 +46,7 @@ export default function Projects() {
     try {
       await axios.put(
         `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${draggableId}`,
-        { status: nuevoEstado }
+        { status: nuevoEstado.toLowerCase() }
       );
       fetchProyectos();
     } catch (err) {
@@ -62,7 +62,7 @@ export default function Projects() {
     try {
       await axios.post(
         `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects`,
-        { name: nombre, owner: responsable }
+        { name: nombre, owner: responsable, status: "pendiente" }
       );
       fetchProyectos();
     } catch (err) {
@@ -78,7 +78,11 @@ export default function Projects() {
     try {
       await axios.put(
         `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${proy._id}`,
-        { name: nuevoNombre, owner: nuevoOwner }
+        {
+          name: nuevoNombre,
+          owner: nuevoOwner,
+          status: proy.status.toLowerCase()
+        }
       );
       fetchProyectos();
     } catch (err) {
@@ -101,7 +105,7 @@ export default function Projects() {
   };
 
   const proyectosPorEstado = ESTADOS.reduce((acc, estado) => {
-    acc[estado] = proyectos.filter((p) => p.status === estado);
+    acc[estado] = proyectos.filter((p) => p.status?.toLowerCase() === estado.toLowerCase());
     return acc;
   }, {});
 
@@ -131,7 +135,7 @@ export default function Projects() {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {ESTADOS.map((estado) => (
-            <Droppable droppableId={estado} key={estado}>
+            <Droppable droppableId={estado.toLowerCase()} key={estado}>
               {(provided) => (
                 <div
                   ref={provided.innerRef}
