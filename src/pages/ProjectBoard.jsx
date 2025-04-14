@@ -1,147 +1,199 @@
-// src/pages/ProjectBoard.jsx
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { nanoid } from "nanoid";
+import { Pencil, Trash2 } from "lucide-react";
 
-const initialStatuses = [
-  "pendiente",
-  "en curso",
-  "en pruebas",
-  "por aprobacion",
-  "finalizado",
+const ESTADOS = [
+  "Pendiente",
+  "En Curso",
+  "En Pruebas",
+  "Por Aprobacion",
+  "Finalizado"
 ];
 
-const statusColors = {
-  pendiente: "bg-yellow-100",
-  "en curso": "bg-blue-100",
-  "en pruebas": "bg-purple-100",
-  "por aprobacion": "bg-orange-100",
-  finalizado: "bg-green-100",
+const colores = {
+  Pendiente: "bg-yellow-100",
+  "En Curso": "bg-blue-100",
+  "En Pruebas": "bg-purple-100",
+  "Por Aprobacion": "bg-orange-100",
+  Finalizado: "bg-green-100"
 };
 
-const ProjectBoard = () => {
-  const [projects, setProjects] = useState([]);
+export default function Projects() {
+  const [proyectos, setProyectos] = useState([]);
+
+  const fetchProyectos = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects`
+      );
+      setProyectos(res.data);
+    } catch (err) {
+      console.error("Error cargando proyectos", err);
+    }
+  };
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("projects") || "[]");
-    setProjects(stored);
+    fetchProyectos();
   }, []);
 
-  const onDragEnd = (result) => {
-    const { destination, source, draggableId } = result;
-    if (!destination) return;
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    )
-      return;
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
 
-    const updated = projects.map((project) =>
-      project.id === draggableId
-        ? { ...project, status: destination.droppableId }
-        : project
-    );
+    const { draggableId, destination } = result;
+    const nuevoEstado = destination.droppableId;
 
-    setProjects(updated);
-    localStorage.setItem("projects", JSON.stringify(updated));
+    try {
+      await axios.put(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${draggableId}`,
+        { status: nuevoEstado }
+      );
+      fetchProyectos();
+    } catch (err) {
+      console.error("Error actualizando estado de proyecto", err);
+    }
   };
 
-  const handleAdd = () => {
-    const nombre = prompt("Nombre del proyecto");
-    const owner = prompt("Responsable");
-    if (!nombre || !owner) return;
-    const nuevo = {
-      id: nanoid(),
-      nombre,
-      owner,
-      status: "pendiente",
-    };
-    const updated = [...projects, nuevo];
-    setProjects(updated);
-    localStorage.setItem("projects", JSON.stringify(updated));
+  const agregarProyecto = async () => {
+    const nombre = prompt("Nombre del proyecto:");
+    const responsable = prompt("Responsable(s):");
+    if (!nombre || !responsable) return;
+
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects`,
+        { name: nombre, owner: responsable }
+      );
+      fetchProyectos();
+    } catch (err) {
+      console.error("Error creando proyecto", err);
+    }
   };
 
-  const getCount = (estado) =>
-    projects.filter((p) => p.status === estado).length;
+  const editarProyecto = async (proy) => {
+    const nuevoNombre = prompt("Editar nombre del proyecto:", proy.name);
+    const nuevoOwner = prompt("Editar responsable(s):", proy.owner);
+    if (!nuevoNombre || !nuevoOwner) return;
+
+    try {
+      await axios.put(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${proy._id}`,
+        { name: nuevoNombre, owner: nuevoOwner }
+      );
+      fetchProyectos();
+    } catch (err) {
+      console.error("Error actualizando proyecto", err);
+    }
+  };
+
+  const eliminarProyecto = async (id) => {
+    const confirmacion = confirm("¿Estás seguro que deseas eliminar este proyecto?");
+    if (!confirmacion) return;
+
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${id}`
+      );
+      fetchProyectos();
+    } catch (err) {
+      console.error("Error eliminando proyecto", err);
+    }
+  };
+
+  const proyectosPorEstado = ESTADOS.reduce((acc, estado) => {
+    acc[estado] = proyectos.filter((p) => p.status === estado);
+    return acc;
+  }, {});
 
   return (
-    <div className="p-6 flex-1 space-y-6">
-      <h1 className="text-3xl font-bold text-darkGray">Tablero de Proyectos</h1>
+    <div className="p-6 flex-1">
+      <h1 className="text-3xl font-bold text-darkGray mb-6">Tablero de Proyectos</h1>
 
       {/* Métricas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <MetricCard title="Total" value={projects.length} />
-        <MetricCard title="Pendientes" value={getCount("pendiente")} />
-        <MetricCard title="En Curso" value={getCount("en curso")} />
-        <MetricCard title="En Pruebas" value={getCount("en pruebas")} />
-        <MetricCard title="Finalizados" value={getCount("finalizado")} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-6">
+        <MetricCard label="Total" value={proyectos.length} />
+        {ESTADOS.map((estado) => (
+          <MetricCard
+            key={estado}
+            label={estado}
+            value={proyectosPorEstado[estado]?.length || 0}
+          />
+        ))}
       </div>
 
       <button
-        onClick={handleAdd}
-        className="bg-primary text-white px-4 py-2 rounded hover:bg-blue-700"
+        onClick={agregarProyecto}
+        className="mb-4 bg-primary text-white px-4 py-2 rounded hover:bg-blue-700"
       >
         + Nuevo Proyecto
       </button>
 
-      <div className="overflow-auto">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 min-w-[1000px]">
-            {initialStatuses.map((status) => (
-              <Droppable droppableId={status} key={status}>
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="bg-gray-100 p-4 rounded w-64 min-h-[300px]"
-                  >
-                    <h2 className="font-semibold mb-2 capitalize">
-                      {status.replace("_", " ")}
-                    </h2>
-                    {projects
-                      .filter((p) => p.status === status)
-                      .map((project, index) => (
-                        <Draggable
-                          draggableId={project.id}
-                          index={index}
-                          key={project.id}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {ESTADOS.map((estado) => (
+            <Droppable droppableId={estado} key={estado}>
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="bg-gray-100 rounded p-4 min-h-[200px]"
+                >
+                  <h2 className="font-semibold mb-2">{estado}</h2>
+                  {proyectosPorEstado[estado].map((proy, index) => (
+                    <Draggable
+                      key={proy._id}
+                      draggableId={proy._id}
+                      index={index}
+                    >
+                      {(provided) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className={`rounded p-3 mb-2 shadow ${colores[estado]}`}
                         >
-                          {(provided) => (
-                            <div
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              ref={provided.innerRef}
-                              className={`mb-2 p-3 rounded shadow ${
-                                statusColors[project.status] || "bg-white"
-                              }`}
-                            >
-                              <h3 className="font-bold text-sm">
-                                {project.nombre}
-                              </h3>
-                              <p className="text-xs text-gray-700">
-                                Responsable: {project.owner}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-semibold">{proy.name}</p>
+                              <p className="text-sm text-gray-700">
+                                Responsable: {proy.owner}
                               </p>
                             </div>
-                          )}
-                        </Draggable>
-                      ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            ))}
-          </div>
-        </DragDropContext>
-      </div>
+                            <div className="flex space-x-2">
+                              <button
+                                className="text-gray-600 hover:text-blue-600"
+                                onClick={() => editarProyecto(proy)}
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                className="text-gray-600 hover:text-red-600"
+                                onClick={() => eliminarProyecto(proy._id)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          ))}
+        </div>
+      </DragDropContext>
     </div>
   );
-};
+}
 
-const MetricCard = ({ title, value }) => (
-  <div className="bg-gray-800 text-white p-4 rounded-xl shadow">
-    <h3 className="text-sm font-medium">{title}</h3>
-    <p className="text-2xl font-bold">{value}</p>
-  </div>
-);
-
-export default ProjectBoard;
+function MetricCard({ label, value }) {
+  return (
+    <div className="rounded-xl bg-gray-800 text-white p-4 text-center shadow-md">
+      <p className="text-sm font-medium mb-1">{label}</p>
+      <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
