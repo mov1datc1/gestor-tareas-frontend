@@ -22,14 +22,15 @@ const colores = {
 export default function Projects() {
   const [proyectos, setProyectos] = useState([]);
 
+  const API_URL =
+    import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com";
+
   const fetchProyectos = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects`
-      );
+      const res = await axios.get(`${API_URL}/api/projects`);
       setProyectos(res.data);
     } catch (err) {
-      console.error("Error cargando proyectos", err);
+      console.error("❌ Error cargando proyectos", err);
     }
   };
 
@@ -44,13 +45,12 @@ export default function Projects() {
     const nuevoEstado = destination.droppableId;
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${draggableId}`,
-        { status: nuevoEstado.toLowerCase() }
-      );
-      fetchProyectos();
+      await axios.put(`${API_URL}/api/projects/${draggableId}`, {
+        status: nuevoEstado.toLowerCase()
+      });
+      setTimeout(fetchProyectos, 300);
     } catch (err) {
-      console.error("Error actualizando estado de proyecto", err);
+      console.error("❌ Error actualizando estado", err);
     }
   };
 
@@ -60,13 +60,14 @@ export default function Projects() {
     if (!nombre || !responsable) return;
 
     try {
-      await axios.post(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects`,
-        { name: nombre, owner: responsable, status: "pendiente" }
-      );
-      fetchProyectos();
+      await axios.post(`${API_URL}/api/projects`, {
+        name: nombre,
+        owner: responsable,
+        status: "pendiente"
+      });
+      setTimeout(fetchProyectos, 500);
     } catch (err) {
-      console.error("Error creando proyecto", err);
+      console.error("❌ Error creando proyecto", err);
     }
   };
 
@@ -76,36 +77,33 @@ export default function Projects() {
     if (!nuevoNombre || !nuevoOwner) return;
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${proy._id}`,
-        {
-          name: nuevoNombre,
-          owner: nuevoOwner,
-          status: proy.status.toLowerCase()
-        }
-      );
-      fetchProyectos();
+      await axios.put(`${API_URL}/api/projects/${proy._id}`, {
+        name: nuevoNombre,
+        owner: nuevoOwner,
+        status: proy.status.toLowerCase()
+      });
+      setTimeout(fetchProyectos, 500);
     } catch (err) {
-      console.error("Error actualizando proyecto", err);
+      console.error("❌ Error actualizando proyecto", err);
     }
   };
 
   const eliminarProyecto = async (id) => {
-    const confirmacion = confirm("¿Estás seguro que deseas eliminar este proyecto?");
+    const confirmacion = confirm("¿Eliminar este proyecto?");
     if (!confirmacion) return;
 
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/projects/${id}`
-      );
-      fetchProyectos();
+      await axios.delete(`${API_URL}/api/projects/${id}`);
+      setTimeout(fetchProyectos, 300);
     } catch (err) {
-      console.error("Error eliminando proyecto", err);
+      console.error("❌ Error eliminando proyecto", err);
     }
   };
 
   const proyectosPorEstado = ESTADOS.reduce((acc, estado) => {
-    acc[estado] = proyectos.filter((p) => p.status?.toLowerCase() === estado.toLowerCase());
+    acc[estado] = proyectos.filter(
+      (p) => p.status?.toLowerCase() === estado.toLowerCase()
+    );
     return acc;
   }, {});
 
