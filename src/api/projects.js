@@ -1,9 +1,8 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com/api/projects";
-
+// URL fija para producción (Render) y desarrollo
 const API = axios.create({
-  baseURL: API_URL,
+  baseURL: "https://gestor-tareas-backend-jcem.onrender.com/api/projects",
 });
 
 // Obtener todos los proyectos
