@@ -10,6 +10,7 @@ import {
   deleteTask,
 } from "../api/tasks";
 import axios from "axios";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -19,6 +20,8 @@ export default function Tasks() {
   const [showNewTask, setShowNewTask] = useState(false);
   const [filtroPrioridad, setFiltroPrioridad] = useState("Todas");
   const [filtroResponsable, setFiltroResponsable] = useState("");
+  const [verFinalizadas, setVerFinalizadas] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,7 +55,13 @@ export default function Tasks() {
         : (t.owner || "")
             .toLowerCase()
             .includes(filtroResponsable.toLowerCase())
-    );
+    )
+    .filter((t) =>
+      filtroTipo === ""
+        ? true
+        : (t.title || "").toLowerCase().includes(filtroTipo.toLowerCase())
+    )
+    .filter((t) => (verFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"));
 
   const handleGrupoChange = (nuevoGrupo) => {
     setGrupoActivo(nuevoGrupo);
@@ -124,7 +133,7 @@ export default function Tasks() {
   const handleAddNewTask = async (newTask) => {
     try {
       const res = await createTask({ ...newTask, group: grupoActivo });
-      setTasks([...tasks, res.data]);
+      setTasks([res.data, ...tasks]);
       setShowNewTask(false);
     } catch (err) {
       console.error("Error agregando tarea:", err);
@@ -138,6 +147,18 @@ export default function Tasks() {
     } catch (err) {
       console.error("Error eliminando tarea:", err);
     }
+  };
+
+  const onDragEnd = async (result) => {
+    if (!result.destination) return;
+    const tareasActualizadas = Array.from(tareasFiltradas);
+    const [moved] = tareasActualizadas.splice(result.source.index, 1);
+    tareasActualizadas.splice(result.destination.index, 0, moved);
+    const nuevasTareas = tasks.map((t) => {
+      const i = tareasActualizadas.findIndex((x) => x._id === t._id);
+      return i !== -1 ? tareasActualizadas[i] : t;
+    });
+    setTasks(nuevasTareas);
   };
 
   return (
@@ -186,6 +207,12 @@ export default function Tasks() {
           >
             + Nueva Tarea
           </button>
+          <button
+            onClick={() => setVerFinalizadas(!verFinalizadas)}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            {verFinalizadas ? "Ocultar Finalizadas" : "Ver Finalizadas"}
+          </button>
         </div>
       </div>
 
@@ -207,6 +234,13 @@ export default function Tasks() {
           placeholder="Filtrar por responsable"
           className="p-2 border rounded w-64"
         />
+        <input
+          type="text"
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          placeholder="Filtrar por tipo de tarea"
+          className="p-2 border rounded w-64"
+        />
       </div>
 
       {loading ? (
@@ -216,15 +250,33 @@ export default function Tasks() {
           No hay tareas que coincidan con los filtros.
         </p>
       ) : (
-        tareasFiltradas.map((task) => (
-          <TaskCard
-            key={task._id}
-            task={task}
-            onStatusChange={handleStatusChange}
-            onEdit={() => setEditingTask(task)}
-            onDelete={handleDeleteTask}
-          />
-        ))
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="taskList">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {tareasFiltradas.map((task, index) => (
+                  <Draggable key={task._id} draggableId={task._id} index={index}>
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                      >
+                        <TaskCard
+                          task={task}
+                          onStatusChange={handleStatusChange}
+                          onEdit={() => setEditingTask(task)}
+                          onDelete={handleDeleteTask}
+                        />
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       )}
 
       {editingTask && (
