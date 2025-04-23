@@ -3,6 +3,7 @@ import TaskCard from "../components/TaskCard";
 import EditTaskModal from "../components/EditTaskModal";
 import NewGroupModal from "../components/NewGroupModal";
 import NewTaskModal from "../components/NewTaskModal";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import {
   getTasks,
   createTask,
@@ -10,7 +11,6 @@ import {
   deleteTask,
 } from "../api/tasks";
 import axios from "axios";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -20,9 +20,8 @@ export default function Tasks() {
   const [showNewTask, setShowNewTask] = useState(false);
   const [filtroPrioridad, setFiltroPrioridad] = useState("Todas");
   const [filtroResponsable, setFiltroResponsable] = useState("");
-  const [verFinalizadas, setVerFinalizadas] = useState(false);
-  const [filtroTipo, setFiltroTipo] = useState("");
   const [loading, setLoading] = useState(true);
+  const [verFinalizadas, setVerFinalizadas] = useState(false);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -46,22 +45,13 @@ export default function Tasks() {
 
   const tareasFiltradas = tasks
     .filter((t) => t.group === grupoActivo)
-    .filter((t) =>
-      filtroPrioridad === "Todas" ? true : t.priority === filtroPrioridad
-    )
+    .filter((t) => (verFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"))
+    .filter((t) => (filtroPrioridad === "Todas" ? true : t.priority === filtroPrioridad))
     .filter((t) =>
       filtroResponsable === ""
         ? true
-        : (t.owner || "")
-            .toLowerCase()
-            .includes(filtroResponsable.toLowerCase())
-    )
-    .filter((t) =>
-      filtroTipo === ""
-        ? true
-        : (t.title || "").toLowerCase().includes(filtroTipo.toLowerCase())
-    )
-    .filter((t) => (verFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"));
+        : (t.owner || "").toLowerCase().includes(filtroResponsable.toLowerCase())
+    );
 
   const handleGrupoChange = (nuevoGrupo) => {
     setGrupoActivo(nuevoGrupo);
@@ -85,9 +75,7 @@ export default function Tasks() {
   };
 
   const handleDeleteGroup = async () => {
-    const confirmacion = confirm(
-      `¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`
-    );
+    const confirmacion = confirm(`¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`);
     if (!confirmacion) return;
 
     try {
@@ -116,9 +104,7 @@ export default function Tasks() {
   const handleEditSave = async (updatedTask) => {
     try {
       const res = await updateTask(updatedTask._id, updatedTask);
-      const updated = tasks.map((t) =>
-        t._id === updatedTask._id ? res.data : t
-      );
+      const updated = tasks.map((t) => (t._id === updatedTask._id ? res.data : t));
       setTasks(updated);
       setEditingTask(null);
     } catch (err) {
@@ -133,7 +119,7 @@ export default function Tasks() {
   const handleAddNewTask = async (newTask) => {
     try {
       const res = await createTask({ ...newTask, group: grupoActivo });
-      setTasks([res.data, ...tasks]);
+      setTasks([res.data, ...tasks]); // Insertar al inicio
       setShowNewTask(false);
     } catch (err) {
       console.error("Error agregando tarea:", err);
@@ -149,16 +135,14 @@ export default function Tasks() {
     }
   };
 
-  const onDragEnd = async (result) => {
+  const onDragEnd = (result) => {
     if (!result.destination) return;
-    const tareasActualizadas = Array.from(tareasFiltradas);
-    const [moved] = tareasActualizadas.splice(result.source.index, 1);
-    tareasActualizadas.splice(result.destination.index, 0, moved);
-    const nuevasTareas = tasks.map((t) => {
-      const i = tareasActualizadas.findIndex((x) => x._id === t._id);
-      return i !== -1 ? tareasActualizadas[i] : t;
-    });
-    setTasks(nuevasTareas);
+    const tareasGrupo = [...tareasFiltradas];
+    const [moved] = tareasGrupo.splice(result.source.index, 1);
+    tareasGrupo.splice(result.destination.index, 0, moved);
+
+    const nuevas = tasks.filter((t) => t.group !== grupoActivo);
+    setTasks([...nuevas, ...tareasGrupo]);
   };
 
   return (
@@ -209,7 +193,7 @@ export default function Tasks() {
           </button>
           <button
             onClick={() => setVerFinalizadas(!verFinalizadas)}
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+            className="bg-gray-300 text-darkGray px-4 py-2 rounded hover:bg-gray-400"
           >
             {verFinalizadas ? "Ocultar Finalizadas" : "Ver Finalizadas"}
           </button>
@@ -234,13 +218,6 @@ export default function Tasks() {
           placeholder="Filtrar por responsable"
           className="p-2 border rounded w-64"
         />
-        <input
-          type="text"
-          value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-          placeholder="Filtrar por tipo de tarea"
-          className="p-2 border rounded w-64"
-        />
       </div>
 
       {loading ? (
@@ -251,7 +228,7 @@ export default function Tasks() {
         </p>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="taskList">
+          <Droppable droppableId="tareas">
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps}>
                 {tareasFiltradas.map((task, index) => (
