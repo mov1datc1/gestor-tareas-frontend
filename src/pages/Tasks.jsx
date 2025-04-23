@@ -22,6 +22,8 @@ export default function Tasks() {
   const [filtroResponsable, setFiltroResponsable] = useState("");
   const [loading, setLoading] = useState(true);
   const [verFinalizadas, setVerFinalizadas] = useState(false);
+  const [showHeart, setShowHeart] = useState(false);
+  const [showBigHeart, setShowBigHeart] = useState(false);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -96,6 +98,12 @@ export default function Tasks() {
       const res = await updateTask(task._id, { ...task, status: newStatus });
       const updated = tasks.map((t) => (t._id === task._id ? res.data : t));
       setTasks(updated);
+      if (newStatus === "finalizado") {
+        setShowHeart(true);
+        setTimeout(() => setShowHeart(false), 300);
+        setTimeout(() => setShowBigHeart(true), 100);
+        setTimeout(() => setShowBigHeart(false), 1200);
+      }
     } catch (err) {
       console.error("Error actualizando estatus:", err);
     }
@@ -146,7 +154,19 @@ export default function Tasks() {
   };
 
   return (
-    <div className="p-6 flex-1">
+    <div className="p-6 flex-1 relative">
+      {showHeart && (
+        <div className="absolute inset-0 flex items-center justify-center z-40">
+          <span className="text-5xl animate-bounce">❤️</span>
+        </div>
+      )}
+
+      {showBigHeart && (
+        <div className="absolute inset-0 flex items-center justify-center z-50">
+          <span className="text-8xl animate-ping">❤️</span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold text-darkGray mb-2">
