@@ -5,6 +5,9 @@ import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import Dashboard from "./pages/Dashboard";
 import ProjectBoard from "./pages/ProjectBoard";
+import "./wake-up";
+
+
 
 import { getTasks } from "./api/tasks";
 
