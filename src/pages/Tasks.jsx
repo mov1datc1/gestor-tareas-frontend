@@ -3,7 +3,6 @@ import TaskCard from "../components/TaskCard";
 import EditTaskModal from "../components/EditTaskModal";
 import NewGroupModal from "../components/NewGroupModal";
 import NewTaskModal from "../components/NewTaskModal";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import {
   getTasks,
   createTask,
@@ -11,6 +10,8 @@ import {
   deleteTask,
 } from "../api/tasks";
 import axios from "axios";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import Confetti from "react-dom-confetti";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -20,10 +21,10 @@ export default function Tasks() {
   const [showNewTask, setShowNewTask] = useState(false);
   const [filtroPrioridad, setFiltroPrioridad] = useState("Todas");
   const [filtroResponsable, setFiltroResponsable] = useState("");
+  const [filtroTitulo, setFiltroTitulo] = useState("");
+  const [mostrarFinalizadas, setMostrarFinalizadas] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [verFinalizadas, setVerFinalizadas] = useState(false);
-  const [showHeart, setShowHeart] = useState(false);
-  const [showBigHeart, setShowBigHeart] = useState(false);
+  const [confettiTaskId, setConfettiTaskId] = useState(null);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -47,13 +48,18 @@ export default function Tasks() {
 
   const tareasFiltradas = tasks
     .filter((t) => t.group === grupoActivo)
-    .filter((t) => (verFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"))
-    .filter((t) => (filtroPrioridad === "Todas" ? true : t.priority === filtroPrioridad))
+    .filter((t) =>
+      filtroPrioridad === "Todas" ? true : t.priority === filtroPrioridad
+    )
     .filter((t) =>
       filtroResponsable === ""
         ? true
         : (t.owner || "").toLowerCase().includes(filtroResponsable.toLowerCase())
-    );
+    )
+    .filter((t) =>
+      filtroTitulo === "" ? true : t.title?.toLowerCase().includes(filtroTitulo.toLowerCase())
+    )
+    .filter((t) => (mostrarFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"));
 
   const handleGrupoChange = (nuevoGrupo) => {
     setGrupoActivo(nuevoGrupo);
@@ -77,7 +83,9 @@ export default function Tasks() {
   };
 
   const handleDeleteGroup = async () => {
-    const confirmacion = confirm(`¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`);
+    const confirmacion = confirm(
+      `¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`
+    );
     if (!confirmacion) return;
 
     try {
@@ -99,10 +107,8 @@ export default function Tasks() {
       const updated = tasks.map((t) => (t._id === task._id ? res.data : t));
       setTasks(updated);
       if (newStatus === "finalizado") {
-        setShowHeart(true);
-        setTimeout(() => setShowHeart(false), 300);
-        setTimeout(() => setShowBigHeart(true), 100);
-        setTimeout(() => setShowBigHeart(false), 1200);
+        setConfettiTaskId(task._id);
+        setTimeout(() => setConfettiTaskId(null), 1000);
       }
     } catch (err) {
       console.error("Error actualizando estatus:", err);
@@ -112,7 +118,9 @@ export default function Tasks() {
   const handleEditSave = async (updatedTask) => {
     try {
       const res = await updateTask(updatedTask._id, updatedTask);
-      const updated = tasks.map((t) => (t._id === updatedTask._id ? res.data : t));
+      const updated = tasks.map((t) =>
+        t._id === updatedTask._id ? res.data : t
+      );
       setTasks(updated);
       setEditingTask(null);
     } catch (err) {
@@ -127,7 +135,7 @@ export default function Tasks() {
   const handleAddNewTask = async (newTask) => {
     try {
       const res = await createTask({ ...newTask, group: grupoActivo });
-      setTasks([res.data, ...tasks]); // Insertar al inicio
+      setTasks([res.data, ...tasks]);
       setShowNewTask(false);
     } catch (err) {
       console.error("Error agregando tarea:", err);
@@ -143,30 +151,19 @@ export default function Tasks() {
     }
   };
 
-  const onDragEnd = (result) => {
+  const handleDragEnd = (result) => {
     if (!result.destination) return;
-    const tareasGrupo = [...tareasFiltradas];
-    const [moved] = tareasGrupo.splice(result.source.index, 1);
-    tareasGrupo.splice(result.destination.index, 0, moved);
-
-    const nuevas = tasks.filter((t) => t.group !== grupoActivo);
-    setTasks([...nuevas, ...tareasGrupo]);
+    const reordered = Array.from(tareasFiltradas);
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+    const newTasks = tasks.map((t) =>
+      t.group === grupoActivo ? reordered.find((r) => r._id === t._id) || t : t
+    );
+    setTasks(newTasks);
   };
 
   return (
-    <div className="p-6 flex-1 relative">
-      {showHeart && (
-        <div className="absolute inset-0 flex items-center justify-center z-40">
-          <span className="text-5xl animate-bounce">❤️</span>
-        </div>
-      )}
-
-      {showBigHeart && (
-        <div className="absolute inset-0 flex items-center justify-center z-50">
-          <span className="text-8xl animate-ping">❤️</span>
-        </div>
-      )}
-
+    <div className="p-6 flex-1">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold text-darkGray mb-2">
@@ -212,15 +209,15 @@ export default function Tasks() {
             + Nueva Tarea
           </button>
           <button
-            onClick={() => setVerFinalizadas(!verFinalizadas)}
-            className="bg-gray-300 text-darkGray px-4 py-2 rounded hover:bg-gray-400"
+            onClick={() => setMostrarFinalizadas(!mostrarFinalizadas)}
+            className="bg-gray-200 text-darkGray px-4 py-2 rounded hover:bg-gray-300"
           >
-            {verFinalizadas ? "Ocultar Finalizadas" : "Ver Finalizadas"}
+            {mostrarFinalizadas ? "Ocultar Finalizadas" : "Ver Finalizadas"}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-wrap gap-4 mb-6">
         <select
           value={filtroPrioridad}
           onChange={(e) => setFiltroPrioridad(e.target.value)}
@@ -238,6 +235,13 @@ export default function Tasks() {
           placeholder="Filtrar por responsable"
           className="p-2 border rounded w-64"
         />
+        <input
+          type="text"
+          value={filtroTitulo}
+          onChange={(e) => setFiltroTitulo(e.target.value)}
+          placeholder="Filtrar por título de tarea"
+          className="p-2 border rounded w-64"
+        />
       </div>
 
       {loading ? (
@@ -247,7 +251,7 @@ export default function Tasks() {
           No hay tareas que coincidan con los filtros.
         </p>
       ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="tareas">
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps}>
@@ -265,6 +269,9 @@ export default function Tasks() {
                           onEdit={() => setEditingTask(task)}
                           onDelete={handleDeleteTask}
                         />
+                        <div className="absolute top-0 right-0">
+                          <Confetti active={confettiTaskId === task._id} />
+                        </div>
                       </div>
                     )}
                   </Draggable>
