@@ -25,6 +25,7 @@ export default function Tasks() {
   const [mostrarFinalizadas, setMostrarFinalizadas] = useState(false);
   const [loading, setLoading] = useState(true);
   const [confettiTaskId, setConfettiTaskId] = useState(null);
+  const [showHeart, setShowHeart] = useState(false);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -108,7 +109,11 @@ export default function Tasks() {
       setTasks(updated);
       if (newStatus === "finalizado") {
         setConfettiTaskId(task._id);
-        setTimeout(() => setConfettiTaskId(null), 1000);
+        setShowHeart(true);
+        setTimeout(() => {
+          setConfettiTaskId(null);
+          setShowHeart(false);
+        }, 1500);
       }
     } catch (err) {
       console.error("Error actualizando estatus:", err);
@@ -163,7 +168,13 @@ export default function Tasks() {
   };
 
   return (
-    <div className="p-6 flex-1">
+    <div className="p-6 flex-1 relative">
+      {showHeart && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="text-red-500 text-6xl animate-ping">❤️</div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold text-darkGray mb-2">
@@ -307,4 +318,5 @@ export default function Tasks() {
     </div>
   );
 }
+
 
