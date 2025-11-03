@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import TaskCard from "../components/TaskCard";
+import TaskTable from "../components/TaskTable";
 import EditTaskModal from "../components/EditTaskModal";
 import NewGroupModal from "../components/NewGroupModal";
 import NewTaskModal from "../components/NewTaskModal";
@@ -10,8 +10,6 @@ import {
   deleteTask,
 } from "../api/tasks";
 import axios from "axios";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import Confetti from "react-dom-confetti";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -156,17 +154,6 @@ export default function Tasks() {
     }
   };
 
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    const reordered = Array.from(tareasFiltradas);
-    const [moved] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, moved);
-    const newTasks = tasks.map((t) =>
-      t.group === grupoActivo ? reordered.find((r) => r._id === t._id) || t : t
-    );
-    setTasks(newTasks);
-  };
-
   return (
     <div className="p-6 flex-1 relative">
       {showHeart && (
@@ -268,36 +255,13 @@ export default function Tasks() {
           No hay tareas que coincidan con los filtros.
         </p>
       ) : (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="tareas">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps}>
-                {tareasFiltradas.map((task, index) => (
-                  <Draggable key={task._id} draggableId={task._id} index={index}>
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                      >
-                        <TaskCard
-                          task={task}
-                          onStatusChange={handleStatusChange}
-                          onEdit={() => setEditingTask(task)}
-                          onDelete={handleDeleteTask}
-                        />
-                        <div className="absolute top-0 right-0">
-                          <Confetti active={confettiTaskId === task._id} />
-                        </div>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <TaskTable
+          tasks={tareasFiltradas}
+          onStatusChange={handleStatusChange}
+          onEdit={(task) => setEditingTask(task)}
+          onDelete={handleDeleteTask}
+          confettiTaskId={confettiTaskId}
+        />
       )}
 
       {editingTask && (
