@@ -17,7 +17,7 @@ export default function NewTaskModal({ onClose, onAdd }) {
 
   const handleSubmit = () => {
     if (form.title.trim()) {
-      onAdd(form);
+      onAdd({ ...form, createdAt: form.createdAt || new Date().toISOString() });
       onClose();
     }
   };

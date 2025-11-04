@@ -30,7 +30,7 @@ export default function Tasks() {
     async function fetchTasks() {
       try {
         const res = await getTasks();
-        setTasks(res.data);
+        setTasks(sortTasksByOrder(res.data));
         const nombresDeGrupos = [...new Set(res.data.map((t) => t.group))];
         if (!nombresDeGrupos.includes(grupoActivo)) {
           setGrupoActivo(nombresDeGrupos[0] || "");
@@ -60,6 +60,23 @@ export default function Tasks() {
     const parsed = new Date(createdValue);
     if (Number.isNaN(parsed.getTime())) return 0;
     return parsed.getTime();
+  };
+
+  const sortTasksByOrder = (list) => {
+    return [...list].sort((a, b) => {
+      if (a.group === b.group) {
+        const orderA = typeof a.order === "number" ? a.order : Number.MAX_SAFE_INTEGER;
+        const orderB = typeof b.order === "number" ? b.order : Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+      }
+
+      const aTime = getCreatedTimestamp(a);
+      const bTime = getCreatedTimestamp(b);
+
+      return bTime - aTime;
+    });
   };
 
   const tareasFiltradas = tasks
@@ -109,7 +126,7 @@ export default function Tasks() {
         { newGroupName: nuevoNombre }
       );
       const res = await getTasks();
-      setTasks(res.data);
+      setTasks(sortTasksByOrder(res.data));
       setGrupoActivo(nuevoNombre);
     } catch (err) {
       console.error("Error renombrando grupo:", err);
@@ -127,8 +144,9 @@ export default function Tasks() {
         `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/groups/${grupoActivo}`
       );
       const tareasRestantes = tasks.filter((t) => t.group !== grupoActivo);
-      setTasks(tareasRestantes);
-      const nuevosGrupos = [...new Set(tareasRestantes.map((t) => t.group))];
+      const ordenadas = sortTasksByOrder(tareasRestantes);
+      setTasks(ordenadas);
+      const nuevosGrupos = [...new Set(ordenadas.map((t) => t.group))];
       setGrupoActivo(nuevosGrupos[0] || "");
     } catch (err) {
       console.error("Error eliminando grupo:", err);
@@ -138,8 +156,9 @@ export default function Tasks() {
   const handleStatusChange = async (task, newStatus) => {
     try {
       const res = await updateTask(task._id, { ...task, status: newStatus });
-      const updated = tasks.map((t) => (t._id === task._id ? res.data : t));
-      setTasks(updated);
+      setTasks((prev) =>
+        sortTasksByOrder(prev.map((t) => (t._id === task._id ? res.data : t)))
+      );
       if (newStatus === "finalizado") {
         setConfettiTaskId(task._id);
         setShowHeart(true);
@@ -156,10 +175,11 @@ export default function Tasks() {
   const handleEditSave = async (updatedTask) => {
     try {
       const res = await updateTask(updatedTask._id, updatedTask);
-      const updated = tasks.map((t) =>
-        t._id === updatedTask._id ? res.data : t
+      setTasks((prev) =>
+        sortTasksByOrder(
+          prev.map((t) => (t._id === updatedTask._id ? res.data : t))
+        )
       );
-      setTasks(updated);
       setEditingTask(null);
     } catch (err) {
       console.error("Error editando tarea:", err);
@@ -172,8 +192,11 @@ export default function Tasks() {
 
   const handleAddNewTask = async (newTask) => {
     try {
-      const res = await createTask({ ...newTask, group: grupoActivo });
-      setTasks([res.data, ...tasks]);
+      const timestamp = newTask.createdAt || new Date().toISOString();
+      const payload = { ...newTask, group: grupoActivo, createdAt: timestamp };
+      const res = await createTask(payload);
+      const createdTask = res.data?.createdAt ? res.data : { ...res.data, createdAt: timestamp };
+      setTasks((prev) => sortTasksByOrder([createdTask, ...prev]));
       setShowNewTask(false);
     } catch (err) {
       console.error("Error agregando tarea:", err);
@@ -183,9 +206,85 @@ export default function Tasks() {
   const handleDeleteTask = async (taskToDelete) => {
     try {
       await deleteTask(taskToDelete._id);
-      setTasks(tasks.filter((t) => t._id !== taskToDelete._id));
+      setTasks((prev) =>
+        sortTasksByOrder(prev.filter((t) => t._id !== taskToDelete._id))
+      );
     } catch (err) {
       console.error("Error eliminando tarea:", err);
+    }
+  };
+
+  const handleMoveTask = async (taskToMove, targetGroup) => {
+    if (!targetGroup || taskToMove.group === targetGroup) return;
+
+    try {
+      const res = await updateTask(taskToMove._id, {
+        ...taskToMove,
+        group: targetGroup,
+      });
+
+      setTasks((prev) =>
+        sortTasksByOrder(
+          prev.map((task) => (task._id === taskToMove._id ? res.data : task))
+        )
+      );
+    } catch (err) {
+      console.error("Error moviendo tarea:", err);
+    }
+  };
+
+  const handleReorderTasks = async ({ sourceIndex, destinationIndex, taskOrder }) => {
+    if (typeof destinationIndex !== "number" || destinationIndex === sourceIndex) {
+      return;
+    }
+
+    setCreatedSortOrder(null);
+
+    const visibleTasks = taskOrder
+      .map((id) => tasks.find((task) => task._id === id))
+      .filter(Boolean);
+
+    if (visibleTasks.length === 0) return;
+
+    const reorderedVisible = Array.from(visibleTasks);
+    const [movedTask] = reorderedVisible.splice(sourceIndex, 1);
+    reorderedVisible.splice(destinationIndex, 0, movedTask);
+
+    const hiddenTasks = tasks.filter(
+      (task) => task.group === grupoActivo && !taskOrder.includes(task._id)
+    );
+
+    const finalOrderTasks = [...reorderedVisible, ...hiddenTasks].map((task, index) => ({
+      ...task,
+      order: index,
+    }));
+
+    setTasks((prev) => {
+      const newTasks = [...prev];
+      const groupIndexes = [];
+
+      prev.forEach((task, index) => {
+        if (task.group === grupoActivo) {
+          groupIndexes.push(index);
+        }
+      });
+
+      finalOrderTasks.forEach((task, idx) => {
+        const targetIndex = groupIndexes[idx];
+        if (typeof targetIndex === "number") {
+          newTasks[targetIndex] = task;
+        }
+      });
+
+      return sortTasksByOrder(newTasks);
+    });
+
+    try {
+      await Promise.all(
+        finalOrderTasks.map((task) => updateTask(task._id, task))
+      );
+    } catch (err) {
+      console.error("Error reordenando tareas:", err);
     }
   };
 
@@ -290,15 +389,19 @@ export default function Tasks() {
           No hay tareas que coincidan con los filtros.
         </p>
       ) : (
-        <TaskTable
-          tasks={tareasOrdenadas}
-          onStatusChange={handleStatusChange}
-          onEdit={(task) => setEditingTask(task)}
-          onDelete={handleDeleteTask}
-          confettiTaskId={confettiTaskId}
-          onToggleCreatedSort={handleToggleCreatedSort}
-          createdSortOrder={createdSortOrder}
-        />
+      <TaskTable
+        tasks={tareasOrdenadas}
+        onStatusChange={handleStatusChange}
+        onEdit={(task) => setEditingTask(task)}
+        onDelete={handleDeleteTask}
+        confettiTaskId={confettiTaskId}
+        onToggleCreatedSort={handleToggleCreatedSort}
+        createdSortOrder={createdSortOrder}
+        onMove={handleMoveTask}
+        groups={grupos}
+        activeGroupId={grupoActivo}
+        onReorder={handleReorderTasks}
+      />
       )}
 
       {editingTask && (
