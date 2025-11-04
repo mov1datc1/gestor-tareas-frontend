@@ -24,6 +24,7 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
   const [confettiTaskId, setConfettiTaskId] = useState(null);
   const [showHeart, setShowHeart] = useState(false);
+  const [createdSortOrder, setCreatedSortOrder] = useState(null);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -45,6 +46,22 @@ export default function Tasks() {
 
   const grupos = [...new Set(tasks.map((t) => t.group))];
 
+  const getCreatedTimestamp = (task) => {
+    const createdValue =
+      task.createdAt ||
+      task.created_at ||
+      task.createdOn ||
+      task.creationDate ||
+      task.created ||
+      task.dateCreated;
+
+    if (!createdValue) return 0;
+
+    const parsed = new Date(createdValue);
+    if (Number.isNaN(parsed.getTime())) return 0;
+    return parsed.getTime();
+  };
+
   const tareasFiltradas = tasks
     .filter((t) => t.group === grupoActivo)
     .filter((t) =>
@@ -59,6 +76,24 @@ export default function Tasks() {
       filtroTitulo === "" ? true : t.title?.toLowerCase().includes(filtroTitulo.toLowerCase())
     )
     .filter((t) => (mostrarFinalizadas ? t.status === "finalizado" : t.status !== "finalizado"));
+
+  const tareasOrdenadas = createdSortOrder
+    ? [...tareasFiltradas].sort((a, b) => {
+        const aTime = getCreatedTimestamp(a);
+        const bTime = getCreatedTimestamp(b);
+        if (createdSortOrder === "desc") {
+          return bTime - aTime;
+        }
+        return aTime - bTime;
+      })
+    : tareasFiltradas;
+
+  const handleToggleCreatedSort = () => {
+    setCreatedSortOrder((prev) => {
+      if (!prev) return "desc";
+      return prev === "desc" ? "asc" : "desc";
+    });
+  };
 
   const handleGrupoChange = (nuevoGrupo) => {
     setGrupoActivo(nuevoGrupo);
@@ -256,11 +291,13 @@ export default function Tasks() {
         </p>
       ) : (
         <TaskTable
-          tasks={tareasFiltradas}
+          tasks={tareasOrdenadas}
           onStatusChange={handleStatusChange}
           onEdit={(task) => setEditingTask(task)}
           onDelete={handleDeleteTask}
           confettiTaskId={confettiTaskId}
+          onToggleCreatedSort={handleToggleCreatedSort}
+          createdSortOrder={createdSortOrder}
         />
       )}
 

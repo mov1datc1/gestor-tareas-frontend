@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Confetti from "react-dom-confetti";
+import { ChevronDown, MoreVertical } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 
-const STATUS_OPTIONS = ["pendiente", "en curso", "finalizado"];
+const STATUS_OPTIONS = ["pendiente", "en curso", "finalizado", "on hold"];
 
 const statusRowColor = {
   pendiente: "bg-orange-50",
   "en curso": "bg-yellow-50",
-  finalizado: "bg-green-50"
+  finalizado: "bg-green-50",
+  "on hold": "bg-purple-50"
 };
 
 const priorityColor = {
@@ -30,19 +32,37 @@ function formatDate(value) {
     year: "numeric"
   });
 }
-
-function formatProgress(progress) {
-  if (progress === null || progress === undefined || progress === "") return "—";
-  const numeric = Number(progress);
-  if (Number.isNaN(numeric)) return progress;
-  return `${numeric}%`;
-}
-
-export default function TaskTable({ tasks, onStatusChange, onEdit, onDelete, confettiTaskId }) {
+export default function TaskTable({
+  tasks,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  confettiTaskId,
+  onToggleCreatedSort,
+  createdSortOrder
+}) {
   const [openStatusFor, setOpenStatusFor] = useState(null);
+  const [openActionsFor, setOpenActionsFor] = useState(null);
+  const tableRef = useRef(null);
 
-  const handleStatusClick = (taskId) => {
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (tableRef.current && !tableRef.current.contains(event.target)) {
+        setOpenStatusFor(null);
+        setOpenActionsFor(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleStatusClick = (event, taskId) => {
+    event.stopPropagation();
     setOpenStatusFor((prev) => (prev === taskId ? null : taskId));
+    setOpenActionsFor(null);
   };
 
   const handleStatusSelection = (task, status) => {
@@ -50,19 +70,50 @@ export default function TaskTable({ tasks, onStatusChange, onEdit, onDelete, con
     setOpenStatusFor(null);
   };
 
+  const handleActionsClick = (event, taskId) => {
+    event.stopPropagation();
+    setOpenActionsFor((prev) => (prev === taskId ? null : taskId));
+    setOpenStatusFor(null);
+  };
+
+  const renderCreatedDate = (task) => {
+    const createdValue =
+      task.createdAt ||
+      task.created_at ||
+      task.createdOn ||
+      task.creationDate ||
+      task.created ||
+      task.dateCreated;
+    return formatDate(createdValue);
+  };
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+    <div ref={tableRef} className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="min-w-full divide-y divide-gray-200 bg-white">
         <thead className="bg-gray-50">
           <tr className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             <th scope="col" className="px-4 py-3 text-left">Proyecto</th>
+            <th scope="col" className="px-4 py-3 text-left">
+              <button
+                type="button"
+                onClick={onToggleCreatedSort}
+                className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-600 hover:text-primary"
+              >
+                Fecha
+                {createdSortOrder ? (
+                  <span className="text-[10px] font-normal text-gray-400">
+                    {createdSortOrder === "desc" ? "↓" : "↑"}
+                  </span>
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+              </button>
+            </th>
             <th scope="col" className="px-4 py-3 text-left">Descripción</th>
             <th scope="col" className="px-4 py-3 text-left">Encargado</th>
             <th scope="col" className="px-4 py-3 text-left">Prioridad</th>
             <th scope="col" className="px-4 py-3 text-left">Estado</th>
             <th scope="col" className="px-4 py-3 text-left">Fecha límite</th>
-            <th scope="col" className="px-4 py-3 text-left">Inicio</th>
-            <th scope="col" className="px-4 py-3 text-left">Avance</th>
             <th scope="col" className="px-4 py-3 text-left">Notas</th>
             <th scope="col" className="px-4 py-3 text-right">Acciones</th>
           </tr>
@@ -70,11 +121,13 @@ export default function TaskTable({ tasks, onStatusChange, onEdit, onDelete, con
         <tbody className="divide-y divide-gray-200 text-sm text-gray-700">
           {tasks.map((task) => {
             const rowBackground = statusRowColor[task.status] || "bg-white";
+            const availableStatuses = STATUS_OPTIONS.filter((status) => status !== task.status);
             return (
               <tr key={task._id} className={`${rowBackground} hover:bg-gray-100 transition-colors`}>
                 <td className="px-4 py-3 align-top font-medium text-gray-900">
                   {task.project || task.group || "—"}
                 </td>
+                <td className="px-4 py-3 align-top">{renderCreatedDate(task)}</td>
                 <td className="px-4 py-3 align-top">
                   <div className="font-semibold text-gray-900">{task.title}</div>
                   {task.description || task.notes ? (
@@ -92,24 +145,22 @@ export default function TaskTable({ tasks, onStatusChange, onEdit, onDelete, con
                   {task.priority || "—"}
                 </td>
                 <td className="relative px-4 py-3 align-top">
-                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(event) => handleStatusClick(event, task._id)}
+                    className="flex items-center gap-2 rounded-full border border-transparent px-2 py-1 text-left text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white"
+                  >
                     <StatusBadge status={task.status} />
-                    <button
-                      type="button"
-                      onClick={() => handleStatusClick(task._id)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Cambiar
-                    </button>
-                  </div>
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                  </button>
                   {openStatusFor === task._id && (
                     <div className="absolute z-10 mt-2 w-36 rounded-md border border-gray-200 bg-white shadow-lg">
-                      {STATUS_OPTIONS.map((status) => (
+                      {availableStatuses.map((status) => (
                         <button
                           key={status}
                           type="button"
                           onClick={() => handleStatusSelection(task, status)}
-                          className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-100"
+                          className="block w-full px-3 py-2 text-left text-xs capitalize hover:bg-gray-100"
                         >
                           {status}
                         </button>
@@ -121,32 +172,45 @@ export default function TaskTable({ tasks, onStatusChange, onEdit, onDelete, con
                   </div>
                 </td>
                 <td className="px-4 py-3 align-top">{formatDate(task.dueDate)}</td>
-                <td className="px-4 py-3 align-top">{formatDate(task.startDate)}</td>
-                <td className="px-4 py-3 align-top">{formatProgress(task.progress)}</td>
                 <td className="px-4 py-3 align-top max-w-xs whitespace-pre-wrap break-words text-xs text-gray-600">
                   {task.notes || "—"}
                 </td>
-                <td className="px-4 py-3 align-top text-right">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="relative px-4 py-3 align-top text-right">
+                  <div className="flex items-center justify-end">
                     <button
                       type="button"
-                      onClick={() => onEdit(task)}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
+                      onClick={(event) => handleActionsClick(event, task._id)}
+                      className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                     >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`¿Estás seguro que deseas eliminar la tarea: "${task.title}"?`)) {
-                          onDelete(task);
-                        }
-                      }}
-                      className="text-xs font-semibold text-red-600 hover:underline"
-                    >
-                      Eliminar
+                      <MoreVertical className="h-4 w-4" />
                     </button>
                   </div>
+                  {openActionsFor === task._id && (
+                    <div className="absolute right-4 z-10 mt-2 w-32 rounded-md border border-gray-200 bg-white text-left text-xs shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenActionsFor(null);
+                          onEdit(task);
+                        }}
+                        className="block w-full px-4 py-2 text-left hover:bg-gray-100"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`¿Estás seguro que deseas eliminar la tarea: "${task.title}"?`)) {
+                            setOpenActionsFor(null);
+                            onDelete(task);
+                          }
+                        }}
+                        className="block w-full px-4 py-2 text-left text-red-600 hover:bg-red-50"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             );
