@@ -6,9 +6,19 @@ const API = axios.create({
   baseURL: "https://gestor-tareas-backend-jcem.onrender.com/api/groups",
 });
 
+// 👉 Obtener todos los grupos (GET /api/groups)
+export const getGroups = () => API.get("/");
+
+// 👉 Crear un nuevo grupo (POST /api/groups)
+export const createGroup = (groupName) =>
+  API.post("/", { name: groupName, groupName });
+
 // 👉 Renombrar un grupo (PUT /api/groups/:oldGroupName)
 export const renameGroup = (oldName, newName) =>
-  API.put(`/${encodeURIComponent(oldName)}`, { newName });
+  API.put(`/${encodeURIComponent(oldName)}`, {
+    newName,
+    newGroupName: newName
+  });
 
 // 👉 Eliminar un grupo (DELETE /api/groups/:groupName)
 export const deleteGroup = (groupName) =>
