@@ -9,11 +9,17 @@ import {
   updateTask,
   deleteTask,
 } from "../api/tasks";
-import axios from "axios";
+import {
+  getGroups,
+  createGroup,
+  renameGroup,
+  deleteGroup,
+} from "../api/groups";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [grupoActivo, setGrupoActivo] = useState("");
+  const [grupos, setGrupos] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -26,26 +32,100 @@ export default function Tasks() {
   const [showHeart, setShowHeart] = useState(false);
   const [createdSortOrder, setCreatedSortOrder] = useState(null);
 
-  useEffect(() => {
-    async function fetchTasks() {
-      try {
-        const res = await getTasks();
-        setTasks(sortTasksByOrder(res.data));
-        const nombresDeGrupos = [...new Set(res.data.map((t) => t.group))];
-        if (!nombresDeGrupos.includes(grupoActivo)) {
-          setGrupoActivo(nombresDeGrupos[0] || "");
+  const mergeGroupNames = (...collections) => {
+    const names = [];
+
+    collections.forEach((collection) => {
+      if (!collection) return;
+
+      if (Array.isArray(collection)) {
+        collection.forEach((value) => {
+          if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (trimmed) {
+              names.push(trimmed);
+            }
+          }
+        });
+      } else if (typeof collection === "string") {
+        const trimmed = collection.trim();
+        if (trimmed) {
+          names.push(trimmed);
         }
-        setLoading(false);
+      }
+    });
+
+    return [...new Set(names)];
+  };
+
+  const extractGroupNames = (payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.groups)) return payload.groups;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.data?.groups)) return payload.data.groups;
+    return [];
+  };
+
+  const resolveGroupNameFromResponse = (payload, fallback) => {
+    if (!payload) return fallback;
+    if (typeof payload === "string") return payload;
+    if (typeof payload.name === "string") return payload.name;
+    if (typeof payload.group === "string") return payload.group;
+    if (typeof payload.group?.name === "string") return payload.group.name;
+    if (typeof payload.data?.name === "string") return payload.data.name;
+    if (typeof payload.data?.group === "string") return payload.data.group;
+    return fallback;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchTasksAndGroups() {
+      try {
+        const [tasksResponse, groupsResponse] = await Promise.all([
+          getTasks(),
+          getGroups().catch((err) => {
+            console.error("Error cargando grupos:", err);
+            return null;
+          }),
+        ]);
+
+        if (!isMounted) return;
+
+        const taskList = Array.isArray(tasksResponse?.data)
+          ? tasksResponse.data
+          : Array.isArray(tasksResponse?.data?.tasks)
+          ? tasksResponse.data.tasks
+          : [];
+
+        const orderedTasks = sortTasksByOrder(taskList);
+        setTasks(orderedTasks);
+
+        const fetchedGroups = groupsResponse ? extractGroupNames(groupsResponse.data) : [];
+        const combinedGroups = mergeGroupNames(fetchedGroups, orderedTasks.map((t) => t.group));
+
+        setGrupos(combinedGroups);
+        setGrupoActivo((current) =>
+          combinedGroups.includes(current) ? current : combinedGroups[0] || ""
+        );
       } catch (err) {
-        console.error("Error cargando tareas:", err);
-        setLoading(false);
+        if (isMounted) {
+          console.error("Error cargando tareas:", err);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
-    fetchTasks();
+
+    fetchTasksAndGroups();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const grupos = [...new Set(tasks.map((t) => t.group))];
-
   const getCreatedTimestamp = (task) => {
     const createdValue =
       task.createdAt ||
@@ -117,37 +197,63 @@ export default function Tasks() {
   };
 
   const handleRenameGroup = async () => {
+    if (!grupoActivo) return;
+
     const nuevoNombre = prompt("Nuevo nombre para el grupo:", grupoActivo);
-    if (!nuevoNombre || nuevoNombre === grupoActivo) return;
+    const trimmedName = nuevoNombre?.trim();
+
+    if (!trimmedName || trimmedName === grupoActivo) return;
 
     try {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/groups/${grupoActivo}`,
-        { newGroupName: nuevoNombre }
+      await renameGroup(grupoActivo, trimmedName);
+
+      setTasks((prev) =>
+        sortTasksByOrder(
+          prev.map((task) =>
+            task.group === grupoActivo ? { ...task, group: trimmedName } : task
+          )
+        )
       );
-      const res = await getTasks();
-      setTasks(sortTasksByOrder(res.data));
-      setGrupoActivo(nuevoNombre);
+
+      setGrupos((prev) =>
+        mergeGroupNames(prev.map((group) => (group === grupoActivo ? trimmedName : group)))
+      );
+
+      setGrupoActivo(trimmedName);
     } catch (err) {
       console.error("Error renombrando grupo:", err);
     }
   };
 
   const handleDeleteGroup = async () => {
+    if (!grupoActivo) return;
+
     const confirmacion = confirm(
       `¿Estás seguro que deseas eliminar el grupo "${grupoActivo}" y todas sus tareas?`
     );
     if (!confirmacion) return;
 
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_URL || "https://gestor-tareas-backend-jcem.onrender.com"}/api/groups/${grupoActivo}`
-      );
+      await deleteGroup(grupoActivo);
+
       const tareasRestantes = tasks.filter((t) => t.group !== grupoActivo);
       const ordenadas = sortTasksByOrder(tareasRestantes);
       setTasks(ordenadas);
-      const nuevosGrupos = [...new Set(ordenadas.map((t) => t.group))];
-      setGrupoActivo(nuevosGrupos[0] || "");
+
+      const gruposActualizados = mergeGroupNames(
+        grupos.filter((group) => group !== grupoActivo),
+        ordenadas.map((tarea) => tarea.group)
+      );
+      setGrupos(gruposActualizados);
+
+      setGrupoActivo((current) => {
+        if (current === grupoActivo) {
+          return gruposActualizados[0] || "";
+        }
+        return gruposActualizados.includes(current)
+          ? current
+          : gruposActualizados[0] || "";
+      });
     } catch (err) {
       console.error("Error eliminando grupo:", err);
     }
@@ -186,8 +292,26 @@ export default function Tasks() {
     }
   };
 
-  const handleCreateNewGroup = (newGroupName) => {
-    setGrupoActivo(newGroupName);
+  const handleCreateNewGroup = async (newGroupName) => {
+    const trimmedName = newGroupName.trim();
+
+    if (!trimmedName) {
+      return false;
+    }
+
+    try {
+      const response = await createGroup(trimmedName);
+      const createdName = resolveGroupNameFromResponse(response?.data, trimmedName);
+
+      const normalizedName = createdName?.trim() || trimmedName;
+
+      setGrupos((prev) => mergeGroupNames(prev, [normalizedName]));
+      setGrupoActivo(normalizedName);
+      return true;
+    } catch (err) {
+      console.error("Error creando grupo:", err);
+      return false;
+    }
   };
 
   const handleAddNewTask = async (newTask) => {
@@ -315,13 +439,15 @@ export default function Tasks() {
             </select>
             <button
               onClick={handleRenameGroup}
-              className="text-sm text-blue-600 hover:underline"
+              disabled={!grupoActivo}
+              className="text-sm text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-blue-300"
             >
               Editar
             </button>
             <button
               onClick={handleDeleteGroup}
-              className="text-sm text-red-600 hover:underline"
+              disabled={!grupoActivo}
+              className="text-sm text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-red-300"
             >
               Eliminar
             </button>
